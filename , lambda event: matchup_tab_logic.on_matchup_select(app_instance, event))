@@ -1,0 +1,16 @@
+    checkbox_display_frame.bind("<Configure>", lambda e: scroll_canvas.configure(scrollregion=scroll_canvas.bbox("all")))
+        opp_label.bind("<Enter>", lambda e, idx=i, player="opp": app_instance.on_card_list_hover(e, idx, player)); opp_label.bind("<Leave>", lambda e: app_instance.card_tooltip.hide_tooltip())
+        local_label.bind("<Enter>", lambda e, idx=i, player="local": app_instance.on_card_list_hover(e, idx, player)); local_label.bind("<Leave>", lambda e: app_instance.card_tooltip.hide_tooltip())
+    hand_label.bind("<Enter>", lambda e, zone="hand": app_instance.on_zone_hover(e, zone)); hand_label.bind("<Leave>", lambda e: app_instance.card_tooltip.hide_tooltip())
+    remaining_label.bind("<Enter>", lambda e, zone="remaining": app_instance.on_zone_hover(e, zone)); remaining_label.bind("<Leave>", lambda e: app_instance.card_tooltip.hide_tooltip())
+    graveyard_label.bind("<Enter>", lambda e, zone="graveyard": app_instance.on_zone_hover(e, zone)); graveyard_label.bind("<Leave>", lambda e: app_instance.card_tooltip.hide_tooltip())
+    banished_label.bind("<Enter>", lambda e, zone="banished": app_instance.on_zone_hover(e, zone)); banished_label.bind("<Leave>", lambda e: app_instance.card_tooltip.hide_tooltip())
+    opp_graveyard_label.bind("<Enter>", lambda e, zone="opp_graveyard": app_instance.on_zone_hover(e, zone)); opp_graveyard_label.bind("<Leave>", lambda e: app_instance.card_tooltip.hide_tooltip())
+    opp_banished_label.bind("<Enter>", lambda e, zone="opp_banished": app_instance.on_zone_hover(e, zone)); opp_banished_label.bind("<Leave>", lambda e: app_instance.card_tooltip.hide_tooltip())
+    app_instance.history_tree.bind("<<TreeviewSelect>>", lambda event: history_tab_logic.on_history_match_select(app_instance, event))
+    app_instance.history_tree.bind("<Double-1>", lambda event: history_tab_logic.on_history_match_double_click(app_instance, event))
+    app_instance.card_stats_tree.bind("<<TreeviewSelect>>", app_instance.on_card_stats_select) # on_card_stats_select is on SnapTrackerApp
+    app_instance.matchup_tree.bind("<<TreeviewSelect>>", lambda event: matchup_tab_logic.on_matchup_select(app_instance, event)) # on_matchup_select is on SnapTrackerApp
+    settings_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))); canvas.create_window((0, 0), window=settings_frame, anchor="nw"); canvas.configure(yscrollcommand=scrollbar.set)
+    app_instance.theme_var = tk.StringVar(value="dark"); theme_combo = ttk.Combobox(theme_select_frame, textvariable=app_instance.theme_var, values=["dark", "light", "custom"]); theme_combo.pack(side=tk.LEFT); theme_combo.bind("<<ComboboxSelected>>", lambda e: app_instance.change_theme(app_instance.theme_var.get()))
+        color_label.bind("<Button-1>", lambda e, key=color_key, lbl=color_label: app_instance.pick_color(key, lbl)) # pick_color is on SnapTrackerApp
