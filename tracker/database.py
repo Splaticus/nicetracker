@@ -1,6 +1,6 @@
 import os, sqlite3, json, hashlib, csv, time, traceback
 from collections import Counter
-from .config import DB_NAME
+from .config import DB_NAME, VERSION
 from .utils import build_id_map, resolve_ref, extract_cards_with_details
 
 def init_db():
