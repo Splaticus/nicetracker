@@ -2416,9 +2416,12 @@ class SnapTrackerApp:
         
         cursor.execute(" ".join(match_deck_query_parts), tuple(match_deck_params))
         all_match_deck_data = cursor.fetchall()
-        
+
         if not all_match_deck_data:
-            self.card_stats_summary_var.set(f"No match data for {selected_deck_name} / {selected_season}")
+            filter_msg = self.card_stats_deck_filter_display_var.get()
+            if selected_season != "All Seasons":
+                filter_msg += f", Season: {selected_season}"
+            self.card_stats_summary_var.set(f"No match data for {filter_msg}.")
             conn.close()
             return
 
@@ -2502,7 +2505,10 @@ class SnapTrackerApp:
         
         # --- Part 4: Populate Treeview ---
         if not card_performance:
-            self.card_stats_summary_var.set(f"No card performance data for {selected_deck_name} / {selected_season}")
+            filter_msg = self.card_stats_deck_filter_display_var.get()
+            if selected_season != "All Seasons":
+                filter_msg += f", Season: {selected_season}"
+            self.card_stats_summary_var.set(f"No card performance data for {filter_msg}.")
             return
 
         for card_def, stats in card_performance.items():
