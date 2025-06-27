@@ -1097,3 +1097,39 @@ def calculate_matchup_statistics(deck_id=None):
     
     conn.close()
     return matchup_stats
+
+def calculate_snap_statistics(deck_id=None):
+    """Calculate snap-related statistics."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    query = """
+        SELECT
+            COUNT(*) as games,
+            SUM(CASE WHEN snap_turn_player > 0 THEN 1 ELSE 0 END) as snapped_games,
+            SUM(CASE WHEN snap_turn_player > 0 AND result = 'win' THEN 1 ELSE 0 END) as snapped_wins,
+            SUM(CASE WHEN snap_turn_opponent > 0 THEN 1 ELSE 0 END) as opp_snapped_games,
+            SUM(CASE WHEN snap_turn_opponent > 0 AND result = 'win' THEN 1 ELSE 0 END) as opp_snapped_wins
+        FROM matches
+    """
+
+    params = []
+    if deck_id and deck_id != "all":
+        query += " WHERE deck_id = ?"
+        params.append(deck_id)
+
+    cursor.execute(query, tuple(params))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        games, snapped_games, snapped_wins, opp_snapped_games, opp_snapped_wins = row
+        return {
+            'games': games or 0,
+            'snapped_games': snapped_games or 0,
+            'snapped_wins': snapped_wins or 0,
+            'opp_snapped_games': opp_snapped_games or 0,
+            'opp_snapped_wins': opp_snapped_wins or 0
+        }
+    return None
+

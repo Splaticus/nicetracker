@@ -4432,7 +4432,9 @@ class SnapTrackerApp:
             "Avg Loss": tk.StringVar(value="0"),
             "Avg Net": tk.StringVar(value="0"),
             "Games": tk.StringVar(value="0-0"),
-            "Win %": tk.StringVar(value="0%")
+            "Win %": tk.StringVar(value="0%"),
+            "Snap Rate": tk.StringVar(value="0%"),
+            "Snap Win %": tk.StringVar(value="0%")
         }
         
         # Create stat labels
@@ -4598,7 +4600,9 @@ class SnapTrackerApp:
                             SUM(CASE WHEN result = 'loss' THEN 1 ELSE 0 END) as losses,
                             SUM(cubes_changed) as net_cubes,
                             AVG(CASE WHEN result = 'win' THEN cubes_changed ELSE NULL END) as avg_win_cubes,
-                            AVG(CASE WHEN result = 'loss' THEN ABS(cubes_changed) ELSE NULL END) as avg_loss_cubes
+                            AVG(CASE WHEN result = 'loss' THEN ABS(cubes_changed) ELSE NULL END) as avg_loss_cubes,
+                            SUM(CASE WHEN snap_turn_player > 0 THEN 1 ELSE 0 END) as snapped_games,
+                            SUM(CASE WHEN snap_turn_player > 0 AND result = 'win' THEN 1 ELSE 0 END) as snapped_wins
                         FROM
                             matches
                         WHERE
@@ -4608,20 +4612,26 @@ class SnapTrackerApp:
                     conn.close()
 
                     if stats and stats[0] > 0:
-                        games, wins, losses, net_cubes, avg_win_cubes, avg_loss_cubes = stats
+                        games, wins, losses, net_cubes, avg_win_cubes, avg_loss_cubes, snapped_games, snapped_wins = stats
                         net_cubes = net_cubes if net_cubes is not None else 0
                         wins = wins if wins is not None else 0
                         losses = losses if losses is not None else 0
                         avg_win_cubes = avg_win_cubes if avg_win_cubes is not None else 0
                         avg_loss_cubes = avg_loss_cubes if avg_loss_cubes is not None else 0
+                        snapped_games = snapped_games if snapped_games is not None else 0
+                        snapped_wins = snapped_wins if snapped_wins is not None else 0
 
                         win_rate = (wins / games * 100) if games > 0 else 0
+                        snap_rate = (snapped_games / games * 100) if games > 0 else 0
+                        snap_win_rate = (snapped_wins / snapped_games * 100) if snapped_games > 0 else 0
                         self.deck_modal_stats["Cubes"].set(f"+{net_cubes}" if net_cubes > 0 else str(net_cubes))
                         self.deck_modal_stats["Avg Win"].set(f"{avg_win_cubes:.1f}")
                         self.deck_modal_stats["Avg Loss"].set(f"{avg_loss_cubes:.1f}")
                         self.deck_modal_stats["Avg Net"].set(f"{(net_cubes/games):.1f}" if games > 0 else "0")
                         self.deck_modal_stats["Games"].set(f"{wins}-{losses}")
                         self.deck_modal_stats["Win %"].set(f"{win_rate:.1f}%")
+                        self.deck_modal_stats["Snap Rate"].set(f"{snap_rate:.1f}%")
+                        self.deck_modal_stats["Snap Win %"].set(f"{snap_win_rate:.1f}%")
                 except Exception as e:
                     print(f"DEBUG: Error getting deck stats for modal: {e}")
                     self.log_error(f"DB Error getting modal stats: {e}")
