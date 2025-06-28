@@ -1097,3 +1097,56 @@ def calculate_matchup_statistics(deck_id=None):
     
     conn.close()
     return matchup_stats
+
+def calculate_snap_statistics(deck_id=None):
+    """Calculate snap-related statistics."""
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    query = """
+        SELECT
+            COUNT(*) as games,
+            SUM(CASE WHEN snap_turn_player > 0 THEN 1 ELSE 0 END) as snapped_games,
+            SUM(CASE WHEN snap_turn_player > 0 AND result = 'win' THEN 1 ELSE 0 END) as snapped_wins,
+            SUM(CASE WHEN snap_turn_opponent > 0 THEN 1 ELSE 0 END) as opp_snapped_games,
+            SUM(CASE WHEN snap_turn_opponent > 0 AND result = 'win' THEN 1 ELSE 0 END) as opp_snapped_wins,
+            AVG(CASE WHEN snap_turn_player > 0 THEN snap_turn_player ELSE NULL END) as avg_snap_turn,
+            AVG(CASE WHEN snap_turn_opponent > 0 THEN snap_turn_opponent ELSE NULL END) as avg_opp_snap_turn,
+            AVG(turns_taken) as avg_turns,
+            AVG(CASE WHEN snap_turn_player > 0 THEN cubes_changed ELSE NULL END) as avg_cubes_snapped,
+            AVG(CASE WHEN snap_turn_opponent > 0 THEN cubes_changed ELSE NULL END) as avg_cubes_when_opp_snapped,
+            MAX(cubes_changed) as max_cubes,
+            MIN(cubes_changed) as min_cubes
+        FROM matches
+    """
+
+    params = []
+    if deck_id and deck_id != "all":
+        query += " WHERE deck_id = ?"
+        params.append(deck_id)
+
+    cursor.execute(query, tuple(params))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        (games, snapped_games, snapped_wins, opp_snapped_games, opp_snapped_wins,
+         avg_snap_turn, avg_opp_snap_turn, avg_turns,
+         avg_cubes_snapped, avg_cubes_when_opp_snapped,
+         max_cubes, min_cubes) = row
+        return {
+            'games': games or 0,
+            'snapped_games': snapped_games or 0,
+            'snapped_wins': snapped_wins or 0,
+            'opp_snapped_games': opp_snapped_games or 0,
+            'opp_snapped_wins': opp_snapped_wins or 0,
+            'avg_snap_turn': avg_snap_turn or 0,
+            'avg_opp_snap_turn': avg_opp_snap_turn or 0,
+            'avg_turns': avg_turns or 0,
+            'avg_cubes_snapped': avg_cubes_snapped or 0,
+            'avg_cubes_when_opp_snapped': avg_cubes_when_opp_snapped or 0,
+            'max_cubes': max_cubes or 0,
+            'min_cubes': min_cubes or 0
+        }
+    return None
+

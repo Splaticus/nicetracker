@@ -11,7 +11,20 @@ from matplotlib.dates import DateFormatter
 import numpy as np
 from .config import VERSION, DB_NAME, CARD_IMAGES_DIR, get_config, apply_theme
 from .utils import get_snap_states_folder, get_game_state_path, build_id_map, resolve_ref, extract_cards_with_details, load_deck_names_from_collection, get_selected_deck_id_from_playstate, load_card_database, update_card_database, import_card_database_from_file, create_fallback_card_database, download_card_image, get_card_tooltip_text
-from .database import init_db, get_current_season_and_rank, get_or_create_deck_id, record_match_event, record_match_result, analyze_game_state_for_gui, export_match_history_to_csv, import_match_history_from_csv, check_for_updates, calculate_win_rate_over_time, calculate_matchup_statistics
+from .database import (
+    init_db,
+    get_current_season_and_rank,
+    get_or_create_deck_id,
+    record_match_event,
+    record_match_result,
+    analyze_game_state_for_gui,
+    export_match_history_to_csv,
+    import_match_history_from_csv,
+    check_for_updates,
+    calculate_win_rate_over_time,
+    calculate_matchup_statistics,
+    calculate_snap_statistics,
+)
 
 class CardTooltip:
     """Tooltip widget for displaying card information"""
@@ -905,13 +918,23 @@ class SnapTrackerApp:
         deck_perf_list_frame = ttk.LabelFrame(parent_frame, text="Deck Statistics", padding="5")
         deck_perf_list_frame.pack(fill=tk.BOTH, expand=True, pady=5)
 
-        cols = ("Deck Name", "Games", "Wins", "Losses", "Ties", "Win %", "Net Cubes", "Avg Cubes/Game", "Avg Cubes/Win", "Avg Cubes/Loss", "Tags")
+        cols = (
+            "Deck Name", "Games", "Wins", "Losses", "Ties", "Win %", "Net Cubes",
+            "Avg Cubes/Game", "Avg Cubes/Win", "Avg Cubes/Loss",
+            "Snap Rate", "Snap Win %", "Opp Snap Rate", "Opp Snap Win %",
+            "Avg Snap Turn", "Avg Opp Snap Turn", "Avg Turns", "Tags"
+        )
         self.deck_performance_tree = ttk.Treeview(deck_perf_list_frame, columns=cols, show="headings", selectmode="browse")
 
         col_widths = {
             "Deck Name": 200, "Games": 60, "Wins": 50, "Losses": 50, "Ties": 50,
             "Win %": 70, "Net Cubes": 70, "Avg Cubes/Game": 100,
-            "Avg Cubes/Win": 100, "Avg Cubes/Loss": 100, "Tags": 100
+            "Avg Cubes/Win": 100, "Avg Cubes/Loss": 100,
+            "Snap Rate": 80, "Snap Win %": 90,
+            "Opp Snap Rate": 100, "Opp Snap Win %": 110,
+            "Avg Snap Turn": 100, "Avg Opp Snap Turn": 120,
+            "Avg Turns": 80,
+            "Tags": 100
         }
 
         for col in cols:
@@ -1751,7 +1774,32 @@ class SnapTrackerApp:
         conn.close()
 
         for row in deck_stats:
-            deck_db_id, name, games, wins, losses, ties, net_cubes, avg_win, avg_loss, tags_json = row
+            (
+                deck_db_id,
+                name,
+                games,
+                wins,
+                losses,
+                ties,
+                net_cubes,
+                avg_win,
+                avg_loss,
+                tags_json,
+            ) = row
+
+            snap_stats = calculate_snap_statistics(deck_db_id)
+            if snap_stats:
+                snapped_games = snap_stats["snapped_games"]
+                snapped_wins = snap_stats["snapped_wins"]
+                opp_snapped_games = snap_stats["opp_snapped_games"]
+                opp_snapped_wins = snap_stats["opp_snapped_wins"]
+                avg_snap_turn = snap_stats["avg_snap_turn"]
+                avg_opp_snap_turn = snap_stats["avg_opp_snap_turn"]
+                avg_turns = snap_stats["avg_turns"]
+            else:
+                snapped_games = snapped_wins = 0
+                opp_snapped_games = opp_snapped_wins = 0
+                avg_snap_turn = avg_opp_snap_turn = avg_turns = 0
 
             wins = wins if wins is not None else 0
             losses = losses if losses is not None else 0
@@ -1760,6 +1808,10 @@ class SnapTrackerApp:
 
             win_rate = (wins / games * 100) if games > 0 else 0
             avg_cubes_game = (net_cubes / games) if games > 0 else 0
+            snap_rate = (snapped_games / games * 100) if games > 0 else 0
+            snap_win_rate = (snapped_wins / snapped_games * 100) if snapped_games > 0 else 0
+            opp_snap_rate = (opp_snapped_games / games * 100) if games > 0 else 0
+            opp_snap_win_rate = (opp_snapped_wins / opp_snapped_games * 100) if opp_snapped_games > 0 else 0
             
             # Handle None for avg_win and avg_loss (SQLite AVG returns NULL if no matching rows)
             avg_win_str = f"{avg_win:.2f}" if avg_win is not None else "N/A"
@@ -1775,19 +1827,28 @@ class SnapTrackerApp:
                     deck_tags_display = "Error"
 
 
-            self.deck_performance_tree.insert("", "end", iid=deck_db_id, values=(
-                name,
-                games,
-                wins,
-                losses,
-                ties,
-                f"{win_rate:.1f}%",
-                net_cubes,
-                f"{avg_cubes_game:.2f}",
-                avg_win_str,
-                avg_loss_str,
-                deck_tags_display
-            ))        
+            self.deck_performance_tree.insert(
+                "", "end", iid=deck_db_id, values=(
+                    name,
+                    games,
+                    wins,
+                    losses,
+                    ties,
+                    f"{win_rate:.1f}%",
+                    net_cubes,
+                    f"{avg_cubes_game:.2f}",
+                    avg_win_str,
+                    avg_loss_str,
+                    f"{snap_rate:.1f}%",
+                    f"{snap_win_rate:.1f}%",
+                    f"{opp_snap_rate:.1f}%",
+                    f"{opp_snap_win_rate:.1f}%",
+                    f"{avg_snap_turn:.1f}",
+                    f"{avg_opp_snap_turn:.1f}",
+                    f"{avg_turns:.1f}",
+                    deck_tags_display,
+                )
+            )
         
     def load_history_tab_data(self):
         """Load match history data and populate UI"""
@@ -4432,7 +4493,14 @@ class SnapTrackerApp:
             "Avg Loss": tk.StringVar(value="0"),
             "Avg Net": tk.StringVar(value="0"),
             "Games": tk.StringVar(value="0-0"),
-            "Win %": tk.StringVar(value="0%")
+            "Win %": tk.StringVar(value="0%"),
+            "Snap Rate": tk.StringVar(value="0%"),
+            "Snap Win %": tk.StringVar(value="0%"),
+            "Opp Snap Rate": tk.StringVar(value="0%"),
+            "Opp Snap Win %": tk.StringVar(value="0%"),
+            "Avg Snap Turn": tk.StringVar(value="0"),
+            "Avg Opp Snap Turn": tk.StringVar(value="0"),
+            "Avg Turns": tk.StringVar(value="0")
         }
         
         # Create stat labels
@@ -4584,14 +4652,23 @@ class SnapTrackerApp:
 
         if not is_resize: # Only update stats text if not just resizing
             for key in self.deck_modal_stats:
-                default_value = "+0" if key == "Cubes" else "0" if key in ["Avg Win", "Avg Loss", "Avg Net"] else "0-0" if key == "Games" else "0%"
+                default_value = (
+                    "+0" if key == "Cubes" else
+                    "0" if key in [
+                        "Avg Win", "Avg Loss", "Avg Net",
+                        "Avg Snap Turn", "Avg Opp Snap Turn", "Avg Turns"
+                    ] else
+                    "0-0" if key == "Games" else
+                    "0%"
+                )
                 self.deck_modal_stats[key].set(default_value)
 
             if deck_id:
                 try:
                     conn = sqlite3.connect(DB_NAME)
                     cursor = conn.cursor()
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         SELECT
                             COUNT(*) as games,
                             SUM(CASE WHEN result = 'win' THEN 1 ELSE 0 END) as wins,
@@ -4603,12 +4680,27 @@ class SnapTrackerApp:
                             matches
                         WHERE
                             deck_id = ?
-                    """, (deck_id,))
+                    """,
+                        (deck_id,),
+                    )
                     stats = cursor.fetchone()
                     conn.close()
 
                     if stats and stats[0] > 0:
                         games, wins, losses, net_cubes, avg_win_cubes, avg_loss_cubes = stats
+                        snap_stats = calculate_snap_statistics(deck_id)
+                        if snap_stats:
+                            snapped_games = snap_stats["snapped_games"]
+                            snapped_wins = snap_stats["snapped_wins"]
+                            opp_snapped_games = snap_stats["opp_snapped_games"]
+                            opp_snapped_wins = snap_stats["opp_snapped_wins"]
+                            avg_snap_turn = snap_stats["avg_snap_turn"]
+                            avg_opp_snap_turn = snap_stats["avg_opp_snap_turn"]
+                            avg_turns = snap_stats["avg_turns"]
+                        else:
+                            snapped_games = snapped_wins = 0
+                            opp_snapped_games = opp_snapped_wins = 0
+                            avg_snap_turn = avg_opp_snap_turn = avg_turns = 0
                         net_cubes = net_cubes if net_cubes is not None else 0
                         wins = wins if wins is not None else 0
                         losses = losses if losses is not None else 0
@@ -4616,12 +4708,23 @@ class SnapTrackerApp:
                         avg_loss_cubes = avg_loss_cubes if avg_loss_cubes is not None else 0
 
                         win_rate = (wins / games * 100) if games > 0 else 0
+                        snap_rate = (snapped_games / games * 100) if games > 0 else 0
+                        snap_win_rate = (snapped_wins / snapped_games * 100) if snapped_games > 0 else 0
+                        opp_snap_rate = (opp_snapped_games / games * 100) if games > 0 else 0
+                        opp_snap_win_rate = (opp_snapped_wins / opp_snapped_games * 100) if opp_snapped_games > 0 else 0
                         self.deck_modal_stats["Cubes"].set(f"+{net_cubes}" if net_cubes > 0 else str(net_cubes))
                         self.deck_modal_stats["Avg Win"].set(f"{avg_win_cubes:.1f}")
                         self.deck_modal_stats["Avg Loss"].set(f"{avg_loss_cubes:.1f}")
                         self.deck_modal_stats["Avg Net"].set(f"{(net_cubes/games):.1f}" if games > 0 else "0")
                         self.deck_modal_stats["Games"].set(f"{wins}-{losses}")
                         self.deck_modal_stats["Win %"].set(f"{win_rate:.1f}%")
+                        self.deck_modal_stats["Snap Rate"].set(f"{snap_rate:.1f}%")
+                        self.deck_modal_stats["Snap Win %"].set(f"{snap_win_rate:.1f}%")
+                        self.deck_modal_stats["Opp Snap Rate"].set(f"{opp_snap_rate:.1f}%")
+                        self.deck_modal_stats["Opp Snap Win %"].set(f"{opp_snap_win_rate:.1f}%")
+                        self.deck_modal_stats["Avg Snap Turn"].set(f"{avg_snap_turn:.1f}")
+                        self.deck_modal_stats["Avg Opp Snap Turn"].set(f"{avg_opp_snap_turn:.1f}")
+                        self.deck_modal_stats["Avg Turns"].set(f"{avg_turns:.1f}")
                 except Exception as e:
                     print(f"DEBUG: Error getting deck stats for modal: {e}")
                     self.log_error(f"DB Error getting modal stats: {e}")
